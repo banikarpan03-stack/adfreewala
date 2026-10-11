@@ -442,59 +442,65 @@ $("go").onclick=async ()=>{
     }catch(e){setStatus("err","Custom endpoint failed: "+e.message);return;}
   }
 
-  /* 3) Free no-key extractors. Primary: ronnieverse "get_m3u8_stream_fast" (powers
-       PlayDiskWala), which returns an HLS m3u8 for any DiskWala link. Fallbacks:
-       scrape the share page / hit the API through public CORS proxies. */
-  setStatus("busy","Extracting stream (free, no key) — this can take 5–15s…");
+  /* 3) In-browser free extractors — RACE all of them in parallel with a single
+        ~20s cap. First usable stream wins; otherwise fail fast (no 2-minute wait). */
+  setStatus("busy","Extracting stream (free, no key)…");
   const encLink=encodeURIComponent(link);
-  // 3a) ronnieverse free m3u8 extractor — try direct, then through each CORS proxy
   const rnvBase="https://api.ronnieverse.site/get_m3u8_stream_fast/"+encLink;
-  const m3u8Sources=[rnvBase].concat(PROXIES.map(p=>p(rnvBase)));
-  for(const src of m3u8Sources){
-    try{
-      const r=await fetchT(src,{headers:{Referer:"https://playdiskwala.in/"},credentials:"omit"},30000);
-      if(!r.ok)continue;
-      const txt=await r.text();
-      // ronnieverse returns either a raw m3u8 playlist or a JSON with the stream
-      let stream=null;
-      try{
-        const j=JSON.parse(txt);
-        stream=j.stream_url||j.m3u8||j.url||j.stream||j.data||null;
-      }catch(_){
-        stream=/^\s*#EXTM3U/i.test(txt)||/\.m3u8/i.test(txt)?txt.trim():null;
-      }
-      if(stream){showPlayer(stream,{via:"ronnieverse free extractor"},link);return;}
-    }catch(_){/* try next source */}
-  }
-  // 3b) scrape the share page through a CORS proxy
-  setStatus("busy","Scraping DiskWala share page via proxy…");
   const {sharePage, api} = diskwalaTargets(link);
-  for(const prox of PROXIES){
+
+  // Every candidate fetch, each resolving to {stream, via} or null.
+  const jobs=[];
+  const parseM3u8 = (txt)=>{
+    let j=null; try{j=JSON.parse(txt);}catch(_){}
+    if(j){ const s=j.stream_url||j.m3u8||j.url||j.stream||j.data; if(s&&/^https?:/.test(s)) return s; }
+    if(/^\s*#EXTM3U/i.test(txt)||/\.m3u8/i.test(txt)) return txt.trim();
+    return null;
+  };
+  // 3a) ronnieverse m3u8 (direct + via each proxy)
+  [rnvBase].concat(PROXIES.map(p=>p(rnvBase))).forEach((src,ix)=>{
+    jobs.push(async()=>{
+      try{
+        const r=await fetchT(src,{headers:{Referer:"https://playdiskwala.in/"},credentials:"omit"},18000);
+        if(!r.ok)return null;
+        const txt=await r.text();
+        const stream=parseM3u8(txt);
+        return stream?{stream,via:"ronnieverse"+(ix===0?"":" (proxy)")} : null;
+      }catch(_){return null;}
+    });
+  });
+  // 3b) share-page scrape via each proxy
+  PROXIES.forEach(p=>jobs.push(async()=>{
     try{
-      const r=await fetchT(prox(sharePage),{},15000);
-      if(!r.ok)continue;
+      const r=await fetchT(p(sharePage),{},15000);
+      if(!r.ok)return null;
       const txt=await r.text();
       const stream=pickFromHtmlOrJson(txt);
-      if(stream){showPlayer(stream,{via:"share page scrape"},link);return;}
-    }catch(_){}
-  }
-  // 3c) hit the API endpoints through the proxies
-  setStatus("busy","Trying DiskWala API via proxy…");
-  for(const cand of api){
-    for(const prox of PROXIES){
-      try{
-        const r=await fetchT(prox(cand),{},15000);
-        if(!r.ok)continue;
-        const txt=await r.text();
-        if(!txt||txt.length<10)continue;
-        const stream=pickFromHtmlOrJson(txt);
-        if(stream){showPlayer(stream,{via:"api proxy:"+cand.split("?")[0]},link);return;}
-      }catch(_){/* next */}
-    }
-  }
+      return stream?{stream,via:"share page scrape"}:null;
+    }catch(_){return null;}
+  }));
+  // 3c) API endpoints via each proxy
+  api.forEach((cand,ix)=>PROXIES.forEach(p=>jobs.push(async()=>{
+    try{
+      const r=await fetchT(p(cand),{},15000);
+      if(!r.ok)return null;
+      const txt=await r.text();
+      if(!txt||txt.length<10)return null;
+      const stream=pickFromHtmlOrJson(txt);
+      return stream?{stream,via:"api proxy"}:null;
+    }catch(_){return null;}
+  })));
+
+  // Run all in parallel; a 20s deadline forces a fast-fail if none resolve.
+  const deadline=new Promise(res=>setTimeout(()=>res("__timeout__"),20000));
+  const results=await Promise.all(jobs.map(j=>j()));
+  const hit=results.find(Boolean);
+  if(hit){ showPlayer(hit.stream,{via:hit.via},link); return; }
+  await deadline; // (already elapsed by the time we're here)
+
   let errBits=[];
   if(fastTried && fastFailed) errBits.push("the fast backend was offline");
-  errBits.push("the in-browser free extractors didn't resolve this link just now (DiskWala rate-limits them).");
+  errBits.push("the free extractors didn't resolve this link just now (DiskWala rate-limits them).");
   $("backupRow").classList.remove("hidden");
   setStatus("err", errBits.join(" ")+" Tap Fetch & Play again, or use the backup player below.",true);
 };
