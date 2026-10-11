@@ -119,6 +119,14 @@
         <span id="statusText">Paste a DiskWala shared link, then hit “Fetch &amp; Play”.</span>
       </div>
 
+      <div id="backupRow" class="hidden" style="margin-top:10px">
+        <a id="backupLink" target="_blank" rel="noopener"
+           style="display:inline-block;color:var(--accent2);font-size:13px;font-weight:600;text-decoration:none;
+                  padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel2)">
+          ↗ Didn’t work? Open in PlayDiskWala (independent backup player)
+        </a>
+      </div>
+
       <div id="playerWrap" class="hidden">
         <div class="title-box" id="titleBox"></div>
         <div style="margin-top:14px">
@@ -222,7 +230,7 @@ let lastInfo = {};
 
 /* Default fast serverless backend (a Cloudflare quick tunnel). Overridable in the
    Extraction API tab; if it's offline the app auto-falls back to in-browser extractors. */
-window.__DEFAULT_FAST_BASE = "https://nevada-florida-star-justice.trycloudflare.com";
+window.__DEFAULT_FAST_BASE = "https://clusters-african-keep-asp.trycloudflare.com";
 
 /* known sample links (user can replace with real ones) */
 const SAMPLES = [
@@ -368,29 +376,33 @@ $("go").onclick=async ()=>{
   $("url").value=link;
   setAltLink(link);
   hidePlayer();
+  $("backupRow").classList.add("hidden");
   setStatus("busy","Resolving link to a stream…");
 
   const cfg={backend:$("backend").value};
 
   /* 0) Fast serverless backend (fastest, no key) — /api/resolve then /api/m3u8.
-        Falls through to the in-browser extractors below if it's offline. */
+        Visible progress + 10s fast-fail; if it's offline, fall through to the
+        in-browser extractors below. Records which path ran for the final message. */
+  let fastTried=false, fastFailed=false;
   if(cfg.backend==="fast"){
     let base=($("fastBase").value||"").trim().replace(/\/+$/,"");
     if(!base) base=window.__DEFAULT_FAST_BASE||"";
     if(base){
+      fastTried=true;
       try{
-        setStatus("busy","Asking fast backend to resolve…");
-        const r=await fetchT(base+"/api/resolve?url="+encodeURIComponent(link),{},25000);
+        setStatus("busy","⚡ Fast backend: resolving… (usually <3s)");
+        const r=await fetchT(base+"/api/resolve?url="+encodeURIComponent(link),{},10000);
         if(r.ok){
           const j=await r.json();
           if(j.stream){
-            // If it's HLS, fetch the m3u8 through the backend proxy (CORS-clean, fast)
             const stream = (j.kind==="hls") ? (base+"/api/m3u8?url="+encodeURIComponent(j.stream)) : j.stream;
             showPlayer(stream,{via:"fast backend ("+j.via+")"},link);
             return;
           }
-        }
-      }catch(_){/* backend offline -> fall through */}
+        } else fastFailed=true;
+      }catch(_){ fastFailed=true; }
+      if(fastFailed) setStatus("busy","Fast backend offline — falling back to in-browser extractors…");
     }
   }
 
@@ -480,7 +492,11 @@ $("go").onclick=async ()=>{
       }catch(_){/* next */}
     }
   }
-  setStatus("err","Free extractors didn't resolve this link just now (DiskWala's API is sometimes rate-limited). Retry in a moment, or add a key in the Extraction API tab.",true);
+  let errBits=[];
+  if(fastTried && fastFailed) errBits.push("the fast backend was offline");
+  errBits.push("the in-browser free extractors didn't resolve this link just now (DiskWala rate-limits them).");
+  $("backupRow").classList.remove("hidden");
+  setStatus("err", errBits.join(" ")+" Tap Fetch & Play again, or use the backup player below.",true);
 };
 
 /* ---------- player ---------- */
@@ -531,8 +547,9 @@ $("replay").onclick=()=>{const v=$("video");if(hls){hls.startLoad();}else{v.load
 $("altPlayer").onclick=()=>{ /* link is set in showPlayer; if never set, fall back to the input */ };
 // Set the backup link whenever we (or the user) have a link
 function setAltLink(link){
-  $("altPlayer").href="https://playdiskwala.in/diskwala-video-player?v="+encodeURIComponent(link);
-  $("altPlayer").title="PlayDiskWala (independent backup player)";
+  const href="https://playdiskwala.in/diskwala-video-player?v="+encodeURIComponent(link);
+  const bp=$("backupLink"); if(bp) bp.href=href;
+  const ap=$("altPlayer"); if(ap){ ap.href=href; ap.title="PlayDiskWala (independent backup player)"; }
 }
 $("copyStream").onclick=e=>{e.preventDefault();navigator.clipboard.writeText(lastStreamUrl).then(()=>{
   const a=$("copyStream");const old=a.textContent;a.textContent="✓ Copied";
