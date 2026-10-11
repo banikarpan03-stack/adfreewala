@@ -239,11 +239,9 @@ SAMPLES.forEach(s=>{
 function setStatus(kind,msg){
   const el=$("status");
   el.className="status "+(kind==="busy"?"busy":kind==="err"?"err":kind==="ok"?"ok":"");
-  const inner=el.querySelector("#statusText");
   el.innerHTML = kind==="busy"
     ? `<div class="spin"></div><span style="margin-left:10px">${msg}</span>`
     : `<span>${msg}</span>`;
-  el.appendChild(inner); // keep node reference stable is not critical
 }
 
 /* ---------- backend config ---------- */
@@ -272,7 +270,9 @@ $("saveCfg").onclick=()=>{
 const PROXIES=[
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://api.cors.lol/?url=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${encodeURIComponent(u)}`
 ];
 
 /* DiskWala share-page + API candidates. The share page (diskwala.com/sharing/link?surl=…)
@@ -390,12 +390,9 @@ $("go").onclick=async ()=>{
        scrape the share page / hit the API through public CORS proxies. */
   setStatus("busy","Extracting stream (free, no key) — this can take 5–15s…");
   const encLink=encodeURIComponent(link);
-  // 3a) ronnieverse free m3u8 extractor (try direct, then via CORS proxies for the m3u8 body)
+  // 3a) ronnieverse free m3u8 extractor — try direct, then through each CORS proxy
   const rnvBase="https://api.ronnieverse.site/get_m3u8_stream_fast/"+encLink;
-  const m3u8Sources=[
-    rnvBase,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(rnvBase)}`
-  ];
+  const m3u8Sources=[rnvBase].concat(PROXIES.map(p=>p(rnvBase)));
   for(const src of m3u8Sources){
     try{
       const r=await fetchT(src,{headers:{Referer:"https://playdiskwala.in/"},credentials:"omit"},30000);
