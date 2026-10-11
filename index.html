@@ -147,10 +147,17 @@
         <label>Extraction backend</label>
         <select id="backend" style="width:100%;background:var(--panel2);border:1px solid var(--line);
           color:var(--text);border-radius:10px;padding:12px;font-size:14px">
-          <option value="proxy" selected>Free extractors — ronnieverse + proxy (no key — default)</option>
+          <option value="fast" selected>⚡ Fast serverless backend (fastest, no key — default)</option>
+          <option value="proxy">Free extractors in-browser — ronnieverse + proxy (no key)</option>
           <option value="terabox">TeraBox/DiskWala API (needs your API key)</option>
           <option value="custom">Custom endpoint (fill URL below)</option>
         </select>
+      </div>
+      <div class="field" id="fastField">
+        <label>Fast backend URL (auto-filled; change if you self-host)</label>
+        <input type="text" id="fastBase" placeholder="https://your-tunnel.trycloudflare.com">
+        <p class="hint">Calls <code>/api/resolve?url=…</code> then <code>/api/m3u8?url=…</code>.
+          If the fast backend is offline it falls back to the in-browser extractors automatically.</p>
       </div>
       <div class="field hidden" id="apiKeyField">
         <label>API key</label>
@@ -213,6 +220,10 @@ let hls = null;
 let lastStreamUrl = "";
 let lastInfo = {};
 
+/* Default fast serverless backend (a Cloudflare quick tunnel). Overridable in the
+   Extraction API tab; if it's offline the app auto-falls back to in-browser extractors. */
+window.__DEFAULT_FAST_BASE = "https://nevada-florida-star-justice.trycloudflare.com";
+
 /* known sample links (user can replace with real ones) */
 const SAMPLES = [
   "https://diskwala.com/sharing/link?surl=sample1",
@@ -250,6 +261,7 @@ function setStatus(kind,msg){
 /* ---------- backend config ---------- */
 function loadCfg(){
   const b=$("backend").value;
+  $("fastField").classList.toggle("hidden", b!=="fast");
   $("apiKeyField").classList.toggle("hidden", b!=="terabox");
   $("customField").classList.toggle("hidden", b!=="custom");
 }
@@ -260,10 +272,12 @@ try{
   if(c.backend)$("backend").value=c.backend;
   if(c.apiKey)$("apiKey").value=c.apiKey;
   if(c.customUrl)$("customUrl").value=c.customUrl;
+  if(c.fastBase)$("fastBase").value=c.fastBase;
+  if(!$("fastBase").value && window.__DEFAULT_FAST_BASE) $("fastBase").value=window.__DEFAULT_FAST_BASE;
   loadCfg();
 }catch(e){}
 $("saveCfg").onclick=()=>{
-  const c={backend:$("backend").value,apiKey:$("apiKey").value,customUrl:$("customUrl").value};
+  const c={backend:$("backend").value,apiKey:$("apiKey").value,customUrl:$("customUrl").value,fastBase:$("fastBase").value};
   localStorage.setItem("af_cfg",JSON.stringify(c));
   $("cfgNote").textContent="Saved ✓";
   setTimeout(()=>{$("cfgNote").textContent="Settings persist in localStorage."},1500);
@@ -357,6 +371,28 @@ $("go").onclick=async ()=>{
   setStatus("busy","Resolving link to a stream…");
 
   const cfg={backend:$("backend").value};
+
+  /* 0) Fast serverless backend (fastest, no key) — /api/resolve then /api/m3u8.
+        Falls through to the in-browser extractors below if it's offline. */
+  if(cfg.backend==="fast"){
+    let base=($("fastBase").value||"").trim().replace(/\/+$/,"");
+    if(!base) base=window.__DEFAULT_FAST_BASE||"";
+    if(base){
+      try{
+        setStatus("busy","Asking fast backend to resolve…");
+        const r=await fetchT(base+"/api/resolve?url="+encodeURIComponent(link),{},25000);
+        if(r.ok){
+          const j=await r.json();
+          if(j.stream){
+            // If it's HLS, fetch the m3u8 through the backend proxy (CORS-clean, fast)
+            const stream = (j.kind==="hls") ? (base+"/api/m3u8?url="+encodeURIComponent(j.stream)) : j.stream;
+            showPlayer(stream,{via:"fast backend ("+j.via+")"},link);
+            return;
+          }
+        }
+      }catch(_){/* backend offline -> fall through */}
+    }
+  }
 
   /* 1) TeraBox / DiskWala paid API */
   if(cfg.backend==="terabox"){
