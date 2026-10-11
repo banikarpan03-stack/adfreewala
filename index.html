@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ad-Freewala — Watch DiskWala Videos in Browser</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#131a26; --panel2:#0f1420; --line:#233043;
+    --text:#e8edf6; --muted:#8b98ac; --accent:#4f8cff; --accent2:#22d3a5;
+    --err:#ff6b6b; --ok:#22d3a5; --btn:#4f8cff; --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, #16223a 0%, var(--bg) 55%);
+    color:var(--text);min-height:100vh;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:28px 18px 60px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .logo{
+    width:44px;height:44px;border-radius:12px;flex:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;font-weight:800;color:#fff;font-size:20px;
+    box-shadow:0 6px 24px rgba(79,140,255,.35);
+  }
+  h1{font-size:20px;font-weight:700;letter-spacing:.2px}
+  h1 small{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .inputrow{display:flex;gap:10px;flex-wrap:wrap}
+  input[type=url],input[type=text]{
+    flex:1 1 260px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;outline:none;
+    transition:border-color .15s;min-width:0;
+  }
+  input[type=url]:focus,input[type=text]:focus{border-color:var(--accent)}
+  button{
+    border:none;cursor:pointer;font-weight:600;border-radius:10px;
+    padding:13px 18px;font-size:15px;transition:transform .05s,filter .15s;
+  }
+  button:active{transform:translateY(1px)}
+  .primary{background:var(--btn);color:#fff;flex:0 0 auto;flex-wrap:wrap}
+  .primary:hover{filter:brightness(1.08)}
+  .ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .ghost:hover{color:var(--text);border-color:var(--accent)}
+  .row2{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:14px;
+    margin-top:14px;min-height:44px}
+  .status.err{color:var(--err);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.08)}
+  .status.ok{color:var(--ok);border-color:rgba(34,211,165,.4);background:rgba(34,211,165,.08)}
+  .status.busy{color:var(--accent);border-color:rgba(79,140,255,.4);background:rgba(79,140,255,.08)}
+  .spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:sp .8s linear infinite;flex:none}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  video{width:100%;border-radius:12px;background:#000;aspect-ratio:16/9;display:block}
+  .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .controls a{
+    color:var(--text);font-size:13px;text-decoration:none;padding:8px 12px;border-radius:8px;
+    border:1px solid var(--line);background:var(--panel2)
+  }
+  .controls a:hover{border-color:var(--accent)}
+  .hidden{display:none}
+  .meta{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5;word-break:break-word}
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tab{padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--muted);cursor:pointer;font-size:13px;font-weight:600}
+  .tab.active{color:var(--text);border-color:var(--accent);background:rgba(79,140,255,.1)}
+  .pane{display:none}
+  .pane.active{display:block}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;letter-spacing:.3px}
+  .field{margin-bottom:14px}
+  .field input{width:100%}
+  .hint{font-size:12px;color:var(--muted);line-height:1.55;margin-top:10px}
+  .hint code{background:var(--panel2);padding:1px 6px;border-radius:5px;border:1px solid var(--line);
+    color:var(--accent2);font-size:11px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--muted);cursor:pointer}
+  .chip.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+  footer{margin-top:28px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+  .title-box{margin-top:10px}
+  .title-box h2{font-size:16px;font-weight:600;margin-bottom:4px}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;
+    background:rgba(34,211,165,.15);color:var(--ok);border:1px solid rgba(34,211,165,.3);margin-right:6px}
+  @media(max-width:560px){.inputrow{flex-direction:column}.primary{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">DW</div>
+    <h1>Ad-Freewala<small>Watch any DiskWala video link in your browser — no app, no ads, no subscription.</small></h1>
+  </header>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-pane="play">▶ Watch</div>
+      <div class="tab" data-pane="api">⚙ Extraction API</div>
+      <div class="tab" data-pane="about">ℹ How it works</div>
+    </div>
+
+    <!-- PLAY PANE -->
+    <div class="pane active" id="pane-play">
+      <div class="inputrow">
+        <input type="text" id="url" placeholder="Paste a DiskWala link… e.g. https://diskwala.com/sharing/link?surl=XXXXX" spellcheck="false">
+        <button class="primary" id="go">Fetch &amp; Play</button>
+      </div>
+      <div class="row2">
+        <span style="font-size:13px;color:var(--muted)">Quick test links:</span>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="status" id="status">
+        <span id="statusText">Paste a DiskWala shared link, then hit “Fetch &amp; Play”.</span>
+      </div>
+
+      <div id="playerWrap" class="hidden">
+        <div class="title-box" id="titleBox"></div>
+        <div style="margin-top:14px">
+          <video id="video" controls playsinline></video>
+          <div class="controls">
+            <a id="dlLink" target="_blank" rel="noopener">⬇ Download (open file)</a>
+            <a id="copyStream" href="#">📋 Copy stream URL</a>
+            <button class="ghost" id="replay">↻ Reload</button>
+          </div>
+          <div class="meta" id="meta"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API PANE -->
+    <div class="pane" id="pane-api">
+      <p class="hint" style="margin-top:0;margin-bottom:16px">
+        This tool extracts the direct CDN video URL from a DiskWala shared link and plays it in a clean
+        HTML5 player (with <code>hls.js</code> for HLS/m3u8 streams). Extraction needs a backend because
+        browsers block cross-origin (CORS) requests to the DiskWala API. Pick a source:
+      </p>
+      <div class="field">
+        <label>Extraction backend</label>
+        <select id="backend" style="width:100%;background:var(--panel2);border:1px solid var(--line);
+          color:var(--text);border-radius:10px;padding:12px;font-size:14px">
+          <option value="proxy" selected>Free extractors — ronnieverse + proxy (no key — default)</option>
+          <option value="terabox">TeraBox/DiskWala API (needs your API key)</option>
+          <option value="custom">Custom endpoint (fill URL below)</option>
+        </select>
+      </div>
+      <div class="field hidden" id="apiKeyField">
+        <label>API key</label>
+        <input type="text" id="apiKey" placeholder="e.g. dk_your_key  (stored in this browser only)">
+      </div>
+      <div class="field hidden" id="customField">
+        <label>Extraction URL template</label>
+        <input type="text" id="customUrl" placeholder="https://yourapi.com/extract?url={URL}">
+        <p class="hint">Use <code>{URL}</code> where the encoded link goes, or append <code>?url=…</code> automatically.
+          Response may be JSON (with <code>stream_url</code>/<code>download_url</code>/<code>url</code>/<code>src</code>) or a raw URL.</p>
+      </div>
+      <div class="row2">
+        <button class="ghost" id="saveCfg">Save settings (this device)</button>
+        <span style="font-size:12px;color:var(--muted)" id="cfgNote">Settings persist in localStorage.</span>
+      </div>
+    </div>
+
+    <!-- ABOUT PANE -->
+    <div class="pane" id="pane-about">
+      <p class="hint" style="margin-top:0;margin-bottom:10px">
+        DiskWala stores files on a CDN and shares them through short “surl” links
+        (<code>diskwala.com/sharing/link?surl=…</code>). The official app fetches the real
+        CDN download/stream URL from its API. This tool does the same from your browser,
+        with three strategies in order:
+      </p>
+      <ol style="color:var(--muted);font-size:13px;line-height:1.8;padding-left:18px">
+        <li><strong>Free m3u8 extractor (default, no key):</strong> we call the
+          <code>ronnieverse</code> extractor (the same one behind PlayDiskWala) that returns a
+          clean HLS <code>.m3u8</code> for any DiskWala link, and play it with <code>hls.js</code>
+          — no app, no ads, no login.</li>
+        <li><strong>TeraBox/DiskWala API:</strong> if you have an extraction API key, it’s called
+          directly for the most reliable, high-speed stream + download URLs.</li>
+        <li><strong>Custom endpoint:</strong> point it at your own extractor.</li>
+      </ol>
+      <p class="hint" style="margin-top:14px">
+        <strong>Why a backend/proxy?</strong> DiskWala’s API sends <code>Access-Control-Allow-Origin</code>
+        headers that most browsers reject on a random origin, so a small proxy is needed.
+        The built-in “Public CORS proxy” works out of the box for many links; if a link is
+        rate-limited or the share page hides the stream, drop in a free extraction API key
+        (TeraBox/DiskWala) under the <em>Extraction API</em> tab.
+      </p>
+      <p class="hint" style="margin-top:14px">
+        <strong>Download note:</strong> the “Download” button opens the raw CDN file in a new
+        tab; for large videos, copy the stream URL and download it with any downloader.
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    Single-file webapp — save this as <strong>adfreewala.html</strong> and open it in any browser (or host it
+    on GitHub Pages / Netlify). No data leaves your device except the link you paste (to the chosen backend).
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<script>
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+let hls = null;
+let lastStreamUrl = "";
+let lastInfo = {};
+
+/* known sample links (user can replace with real ones) */
+const SAMPLES = [
+  "https://diskwala.com/sharing/link?surl=sample1",
+  "https://diskwala.com/sharing/link?surl=sample2"
+];
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".pane").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    $("pane-"+t.dataset.pane).classList.add("active");
+  };
+});
+
+/* ---------- chips ---------- */
+const chipsEl=$("chips");
+SAMPLES.forEach(s=>{
+  const c=document.createElement("span");
+  c.className="chip";c.textContent=s.includes("?surl=")?s.split("?surl=")[1].slice(0,10)+"…":"test";
+  c.onclick=()=>$("url").value=s;
+  chipsEl.appendChild(c);
+});
+
+/* ---------- status helpers ---------- */
+function setStatus(kind,msg){
+  const el=$("status");
+  el.className="status "+(kind==="busy"?"busy":kind==="err"?"err":kind==="ok"?"ok":"");
+  const inner=el.querySelector("#statusText");
+  el.innerHTML = kind==="busy"
+    ? `<div class="spin"></div><span style="margin-left:10px">${msg}</span>`
+    : `<span>${msg}</span>`;
+  el.appendChild(inner); // keep node reference stable is not critical
+}
+
+/* ---------- backend config ---------- */
+function loadCfg(){
+  const b=$("backend").value;
+  $("apiKeyField").classList.toggle("hidden", b!=="terabox");
+  $("customField").classList.toggle("hidden", b!=="custom");
+}
+$("backend").onchange=()=>{loadCfg();};
+loadCfg();
+try{
+  const c=JSON.parse(localStorage.getItem("af_cfg")||"{}");
+  if(c.backend)$("backend").value=c.backend;
+  if(c.apiKey)$("apiKey").value=c.apiKey;
+  if(c.customUrl)$("customUrl").value=c.customUrl;
+  loadCfg();
+}catch(e){}
+$("saveCfg").onclick=()=>{
+  const c={backend:$("backend").value,apiKey:$("apiKey").value,customUrl:$("customUrl").value};
+  localStorage.setItem("af_cfg",JSON.stringify(c));
+  $("cfgNote").textContent="Saved ✓";
+  setTimeout(()=>{$("cfgNote").textContent="Settings persist in localStorage."},1500);
+};
+
+/* ---------- proxy lists (free, no key) ---------- */
+const PROXIES=[
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+];
+
+/* DiskWala share-page + API candidates. The share page (diskwala.com/sharing/link?surl=…)
+   embeds the CDN file/stream URLs in its HTML, so scraping it is the most reliable
+   no-key path. The API endpoints may need a key, but are worth a try. */
+function diskwalaTargets(link){
+  const enc=encodeURIComponent(link);
+  const sharePage = /^https?:\/\/(www\.)?diskwala\.com\/sharing\/\?surl=/i.test(link)
+    ? link : `https://diskwala.com/sharing/link?surl=${enc}`;
+  return {
+    sharePage,
+    api:[
+      `https://api.diskwala.in/api/v1/share/link?url=${enc}`,
+      `https://api.diskwala.com/api/v1/share/link?url=${enc}`,
+      `https://api.diskwala.in/?url=${enc}`
+    ]
+  };
+}
+
+/* Try to pull a usable media URL out of raw HTML (share page) or JSON. */
+function pickFromHtmlOrJson(txt){
+  // 1) JSON
+  let j=null;
+  try{ j=JSON.parse(txt.trim()); }catch(_){}
+  if(j){ const s=pickStream(j); if(s) return s; }
+  // 2) HTML: look for m3u8 / mp4 / cdn tokens and common data attributes
+  const re=/https?:[^\s"'\)]+?(\.m3u8|\.mp4)[^\s"'\)]*/i;
+  const m=txt.match(re);
+  if(m) return m[0];
+  // 3) common attribute names
+  for(const attr of ["data-src","data-mp4","data-hls","src","data-url"]){
+    const mm=txt.match(new RegExp(attr+'=["\']([^"\']+)["\']','i'));
+    if(mm && /^https?:/i.test(mm[1])) return mm[1];
+  }
+  return null;
+}
+
+/* ---------- fetch with timeout ---------- */
+async function fetchT(url,opts={},ms=20000){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),ms);
+  try{ return await fetch(url,Object.assign({signal:ctrl.signal},opts)); }
+  finally{ clearTimeout(t); }
+}
+
+/* ---------- extract stream url from a json blob ---------- */
+function pickStream(json){
+  // search deeply for common keys
+  let found=null;
+  const want=["stream_url","stream_download_url","m3u8_url","hls_url","download_url","file_url","url","src","cdn_url","file"];
+  (function walk(o,depth){
+    if(found||depth>6||!o)return;
+    if(Array.isArray(o)){o.forEach(x=>walk(x,depth+1));return;}
+    if(typeof o==="object"){
+      for(const k of want){
+        if(o[k]&&typeof o[k]==="string"&&(o[k].includes("m3u8")||o[k].includes(".mp4")||o[k].startsWith("http"))){
+          found=o[k];return;
+        }
+      }
+      for(const v of Object.values(o))walk(v,depth+1);
+    }
+  })(json,0);
+  return found;
+}
+
+/* ---------- main fetch flow ---------- */
+$("go").onclick=async ()=>{
+  let link=$("url").value.trim();
+  if(!link){setStatus("err","Paste a DiskWala link first.");return;}
+  if(!/^https?:\/\//i.test(link))link="https://"+link;
+  $("url").value=link;
+  hidePlayer();
+  setStatus("busy","Resolving link to a stream…");
+
+  const cfg={backend:$("backend").value};
+
+  /* 1) TeraBox / DiskWala paid API */
+  if(cfg.backend==="terabox"){
+    const key=$("apiKey").value.trim();
+    if(!key){setStatus("err","Add your TeraBox/DiskWala API key in the Extraction API tab.");return;}
+    try{
+      const r=await fetchT("https://api.teraboxdl.site/api/v1/diskwala/extract",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+        body:JSON.stringify({url:link})
+      });
+      const j=await r.json();
+      const arr=j.files||j.data||j;
+      const item=Array.isArray(arr)?arr[0]:arr;
+      const stream=item&&(item.stream_url||item.stream_download_url||item.download_url||item.url);
+      if(stream){showPlayer(stream,item,link);return;}
+      setStatus("err","No stream URL in API response: "+JSON.stringify(j).slice(0,160));
+      return;
+    }catch(e){setStatus("err","TeraBox API call failed: "+e.message);return;}
+  }
+
+  /* 2) custom endpoint */
+  if(cfg.backend==="custom"){
+    const tpl=$("customUrl").value.trim();
+    if(!tpl){setStatus("err","Fill in the custom extraction URL (use {URL}).");return;}
+    const target=tpl.includes("{URL}")?tpl.replace("{URL}",encodeURIComponent(link)):tpl+"?url="+encodeURIComponent(link);
+    try{
+      const r=await fetchT(target);
+      const txt=await r.text();
+      let stream=txt.trim();
+      if(txt.trim().startsWith("{")){try{stream=pickStream(JSON.parse(txt))||stream;}catch(_){}}
+      if(stream&&/^https?:/i.test(stream)){showPlayer(stream,{raw:txt.slice(0,200)},link);return;}
+      setStatus("err","Custom endpoint didn't return a usable stream URL.");
+      return;
+    }catch(e){setStatus("err","Custom endpoint failed: "+e.message);return;}
+  }
+
+  /* 3) Free no-key extractors. Primary: ronnieverse "get_m3u8_stream_fast" (powers
+       PlayDiskWala), which returns an HLS m3u8 for any DiskWala link. Fallbacks:
+       scrape the share page / hit the API through public CORS proxies. */
+  setStatus("busy","Extracting stream (free, no key) — this can take 5–15s…");
+  const encLink=encodeURIComponent(link);
+  // 3a) ronnieverse free m3u8 extractor (try direct, then via CORS proxies for the m3u8 body)
+  const rnvBase="https://api.ronnieverse.site/get_m3u8_stream_fast/"+encLink;
+  const m3u8Sources=[
+    rnvBase,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(rnvBase)}`
+  ];
+  for(const src of m3u8Sources){
+    try{
+      const r=await fetchT(src,{headers:{Referer:"https://playdiskwala.in/"},credentials:"omit"},30000);
+      if(!r.ok)continue;
+      const txt=await r.text();
+      // ronnieverse returns either a raw m3u8 playlist or a JSON with the stream
+      let stream=null;
+      try{
+        const j=JSON.parse(txt);
+        stream=j.stream_url||j.m3u8||j.url||j.stream||j.data||null;
+      }catch(_){
+        stream=/^\s*#EXTM3U/i.test(txt)||/\.m3u8/i.test(txt)?txt.trim():null;
+      }
+      if(stream){showPlayer(stream,{via:"ronnieverse free extractor"},link);return;}
+    }catch(_){/* try next source */}
+  }
+  // 3b) scrape the share page through a CORS proxy
+  setStatus("busy","Scraping DiskWala share page via proxy…");
+  const {sharePage, api} = diskwalaTargets(link);
+  for(const prox of PROXIES){
+    try{
+      const r=await fetchT(prox(sharePage),{},15000);
+      if(!r.ok)continue;
+      const txt=await r.text();
+      const stream=pickFromHtmlOrJson(txt);
+      if(stream){showPlayer(stream,{via:"share page scrape"},link);return;}
+    }catch(_){}
+  }
+  // 3c) hit the API endpoints through the proxies
+  setStatus("busy","Trying DiskWala API via proxy…");
+  for(const cand of api){
+    for(const prox of PROXIES){
+      try{
+        const r=await fetchT(prox(cand),{},15000);
+        if(!r.ok)continue;
+        const txt=await r.text();
+        if(!txt||txt.length<10)continue;
+        const stream=pickFromHtmlOrJson(txt);
+        if(stream){showPlayer(stream,{via:"api proxy:"+cand.split("?")[0]},link);return;}
+      }catch(_){/* next */}
+    }
+  }
+  setStatus("err","Free extractors didn't resolve this link just now (DiskWala's API is sometimes rate-limited). Retry in a moment, or add a key in the Extraction API tab.",true);
+};
+
+/* ---------- player ---------- */
+function hidePlayer(){$("playerWrap").classList.add("hidden");}
+function showPlayer(stream,info,link){
+  const v=$("video");
+  lastStreamUrl=stream;
+  lastInfo=info;
+  $("playerWrap").classList.remove("hidden");
+  $("dlLink").href=stream;
+  $("copyStream").href=stream;
+  const isHls=/\.m3u8|EXTM3U/.test(stream);
+  $("titleBox").innerHTML=`<span class="badge">${isHls?"HLS stream":"Direct file"}</span><h2>Now playing</h2>`;
+  $("meta").textContent="Stream: "+String(stream).replace(/token=[^&]*/i,"token=•••").slice(0,140);
+
+  if(hls){hls.destroy();hls=null;}
+  v.load();
+
+  // CORS-safe playback. If the primary URL can't be fetched (CORS on segments / file),
+  // wrap the URL in a public CORS proxy.
+  function playHls(src){
+    if(window.Hls&&Hls.isSupported()){
+      hls=new Hls();
+      hls.loadSource(src);
+      hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>v.play());
+      hls.on(Hls.Events.ERROR,(e,data)=>{ if(data.fatal){ fallback(); } });
+    }else{ v.src=src; v.play().catch(()=>{}); }
+  }
+  function playMp4(src){ v.src=src; v.play().catch(()=>{}); }
+  function fallback(){
+    const prox=`https://api.allorigins.win/raw?url=${encodeURIComponent(isHls?stream:stream)}`;
+    // proxy-wrapping an m3u8 rewrites relative segment paths; only reliable for mp4.
+    if(!isHls){ playMp4(prox); setStatus("busy","Primary stream hit a CORS wall — retrying through proxy…"); return; }
+    // For HLS, re-try hls with a proxy-prefixed base is complex; tell the user + open raw
+    setStatus("err","Stream stalled (CORS). Use “Copy stream URL” and open it, or retry.",true);
+  }
+
+  if(isHls){ playHls(stream); }
+  else{
+    v.src=stream;
+    v.onerror=()=>fallback();
+    v.play().catch(()=>{});
+  }
+  setStatus("ok","Ready — enjoy the ad-free stream. "+(info&&info.via?("Resolved via "+info.via+" · "):""));
+}
+$("replay").onclick=()=>{const v=$("video");if(hls){hls.startLoad();}else{v.load();}v.play();};
+$("copyStream").onclick=e=>{e.preventDefault();navigator.clipboard.writeText(lastStreamUrl).then(()=>{
+  const a=$("copyStream");const old=a.textContent;a.textContent="✓ Copied";
+  setTimeout(()=>a.textContent=old,1400);
+});};
+
+/* ---------- sample link auto-load from query param (?v=link) ---------- */
+(function(){
+  const p=new URLSearchParams(location.search).get("v");
+  if(p){$("url").value=p;$("go").click();}
+})();
+</script>
+</body>
+</html>
