@@ -298,14 +298,19 @@ function pickFromHtmlOrJson(txt){
   let j=null;
   try{ j=JSON.parse(txt.trim()); }catch(_){}
   if(j){ const s=pickStream(j); if(s) return s; }
-  // 2) HTML: look for m3u8 / mp4 / cdn tokens and common data attributes
-  const re=/https?:[^\s"'\)]+?(\.m3u8|\.mp4)[^\s"'\)]*/i;
-  const m=txt.match(re);
-  if(m) return m[0];
-  // 3) common attribute names
-  for(const attr of ["data-src","data-mp4","data-hls","src","data-url"]){
+  // 2) HTML: find ALL http(s) URLs, then keep only plausible *media* URLs
+  //    (mp4 / m3u8 / cdn / media / file / stream, or on a diskwala CDN), and drop
+  //    analytics / cloudflare / fonts / script noise.
+  const noise=/(cloudflare|google|gtag|ga\.|analytics|beacon|\.js|\.css|\.png|\.jpg|\.svg|\.woff|fonts\.googleapis|doubleclick|adroll|facebook|\.ico|static\.[a-z]+\.(com|net)|revwala|sentry|segment|amplitude)/i;
+  const allUrls=txt.match(/https?:[^"'\s\\<>]+/gi)||[];
+  const isMedia=u=>/\.mp4|\.m3u8|\/cdn\/|\/media\/|\/file|stream|\.webm|\/v\/[0-9a-f]{8,}/i.test(u);
+  // prefer a strong media signal
+  const strong=allUrls.filter(u=>isMedia(u)&&!noise.test(u));
+  if(strong.length) return strong[0];
+  // 3) common attribute names (data-src / data-mp4 / data-hls)
+  for(const attr of ["data-mp4","data-hls","data-src","data-url"]){
     const mm=txt.match(new RegExp(attr+'=["\']([^"\']+)["\']','i'));
-    if(mm && /^https?:/i.test(mm[1])) return mm[1];
+    if(mm && /^https?:/i.test(mm[1]) && isMedia(mm[1]) && !noise.test(mm[1])) return mm[1];
   }
   return null;
 }
