@@ -26,15 +26,23 @@ function extractStream(txt){
 async function resolve(u){
   if(looksLikeStream(u)) return { stream:u, kind:/\.m3u8/i.test(u)?'hls':'mp4', via:'direct-link' };
   // Race the free extractors; first to return a usable stream wins (fast + reliable).
+  const encU = encodeURIComponent(u);
   const jobs = [
     { name:'ronnieverse',
-      url:`${EXTRACT_BASE}${encodeURIComponent(u)}`,
+      url:`${EXTRACT_BASE}${encU}`,
       headers:{ Referer:'https://playdiskwala.in/' } },
     { name:'terabox-free',
       url:'https://api.teraboxdl.site/api/v1/diskwala/extract',
       method:'POST',
       headers:{ 'Content-Type':'application/json', Referer:'https://playdiskwala.in/' },
       body:JSON.stringify({ url:u }) },
+    // FlowVideoPlayer's diskwala downloader endpoint (free)
+    { name:'flowvideoplayer',
+      url:`https://diskwaladownloader.flowvideoplayer.com/api/extract?url=${encU}`,
+      headers:{ Referer:'https://flowvideoplayer.com/' } },
+    { name:'flowvideoplayer-alt',
+      url:`https://flowvideoplayer.com/api/extract?url=${encU}`,
+      headers:{ Referer:'https://flowvideoplayer.com/' } },
   ];
   const settled = await Promise.all(jobs.map(async j=>{
     try{
